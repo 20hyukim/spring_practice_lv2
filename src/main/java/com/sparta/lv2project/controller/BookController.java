@@ -53,4 +53,14 @@ public class BookController {
     public List<BookLoanResponseDto> loanBook(){
         return bookService.loanBook();
     }
+
+    @GetMapping("/members")
+    public List<BookLoanResponseDto> loanAllBook() {
+        return bookService.loanAllBook();
+    }
+
+    @GetMapping("/notloanedbook/{id}")
+    public ResponseEntity<?> availableLoanBook(@PathVariable Long id) {
+        return bookService.availableLoanBook(id);
+    }
 }

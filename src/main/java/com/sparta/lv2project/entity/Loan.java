@@ -14,22 +14,29 @@ import java.time.LocalDateTime;
 @Table(name="loan")
 public class Loan extends LoanTimeStamped {
     @Id
-    private Long bookId;
-    @Column(name = "memberId", nullable = false)
-    private Long memberId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "book_id")
+    private Book book;
+
+    @ManyToOne
+    @JoinColumn(name = "member_id")
+    private Member member;
+
+
     @Column(name = "returnStatus")
     private boolean returnStatus;
-    @Column(name = "memberName")
-    private String memberName;
-    @Column(name = "telephone")
-    private Long telephone;
-    @Column(name = "title")
-    private String title;
-    @Column(name = "author")
-    private String author;
 
+    public Loan(Book book, Member member) {
+        this.member = member;
+        this.book = book;
+        this.returnStatus = false;
+        this.setLoanDate();
+    }
 
-    public boolean getReturnStatus(Loan loan) {
-        return loan.returnStatus;
+    public boolean getReturnStatus() {
+        return this.returnStatus;
     }
 }

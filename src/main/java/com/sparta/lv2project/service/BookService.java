@@ -8,12 +8,17 @@ import com.sparta.lv2project.repository.BookRepository;
 import com.sparta.lv2project.repository.LoanRepository;
 import com.sparta.lv2project.repository.MemberRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cglib.core.Local;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Period;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -79,21 +84,26 @@ public class BookService {
             return ResponseEntity.badRequest().body("회원을 찾을 수 없습니다.");
         }
         Member member = memberOptional.get();
+        if(member.getPenalty() != null){
+            LocalDate penaltyDays = member.getPenalty().toLocalDate();
+            if(passedDays(penaltyDays) <= 14){
+                String message = String.format("연체 패날티 : %d일 후에 대출할 수 있습니다.", 14-passedDays(penaltyDays));
+                return ResponseEntity.badRequest().body(message);
+            }
+        }
+
+        Optional<Loan> returnStatusLoan = loanRepository.findByBookIdAndReturnStatus(bookId, false);
+        if(returnStatusLoan.isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("이 책은 현재 대출 중입니다.");
+        }
+
+
 
         Optional<Loan> existingLoan = loanRepository.findByMemberIdAndReturnStatus(memberId, false);
         if(existingLoan.isPresent()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("기존에 대출한 책이 미반납 상태입니다.");
         } else {
-            Loan loan = new Loan();
-            loan.setBookId(bookId);
-            loan.setMemberId(memberId);
-            loan.setMemberName(member.getName());
-            loan.setTelephone(member.getTelephone());
-            loan.setTitle(book.getTitle());
-            loan.setAuthor(book.getAuthor());
-            loan.setReturnStatus(false);
-            loan.setLoanDate();
-
+            Loan loan = new Loan(book, member);
             loanRepository.save(loan);
 
             return ResponseEntity.ok().body("대출 하였습니다.");
@@ -102,23 +112,58 @@ public class BookService {
 
     @Transactional
     public BookLoanResponseDto returnBook(Long id) {
-        if (loanRepository.findById(id).isPresent()) {
-            Loan loan = loanRepository.findById(id).get();
-            if (loan.getReturnStatus(loan)) {
-                throw new IllegalArgumentException("해당 책은 대출되지 않았습니다.");
-            }
-            loan.setReturnStatus(true);
-            loan.setReturnDate();
-            BookLoanResponseDto bookLoanResponseDto = new BookLoanResponseDto(loan);
-            return bookLoanResponseDto;
-
-        } else {
+        List<Loan> loans = loanRepository.findByBookId(id);
+        if (loans.isEmpty()) {
             throw new IllegalArgumentException("해당 책은 대출되지 않았습니다.");
         }
+
+        for (Loan loan : loans) {
+            if (!loan.getReturnStatus()){
+                loan.setReturnStatus(true);
+                loan.setReturnDate(LocalDateTime.now());
+
+                LocalDate loanDate = loan.getLoanDate().toLocalDate();
+                if(passedDays(loanDate) > 7) {
+                    Member member = loan.getMember();
+                    member.setPenalty();
+                    memberRepository.save(member);
+                }
+                BookLoanResponseDto bookLoanResponseDto = new BookLoanResponseDto(loan);
+                return bookLoanResponseDto;
+            }
+        }
+        throw new IllegalArgumentException("모든 대출 기록이 이미 반납되었습니다.");
     }
 
     public List<BookLoanResponseDto> loanBook() {
+        return loanRepository.findAll(Sort.by("loanDate")).stream()
+                .filter(loan -> !loan.getReturnStatus())
+                .map(BookLoanResponseDto::new).toList();
+    }
+
+
+    public List<BookLoanResponseDto> loanAllBook() {
         return loanRepository.findAll(Sort.by("loanDate")).stream().map(BookLoanResponseDto::new).toList();
     }
+
+    public ResponseEntity<?> availableLoanBook(Long id) {
+        List<Loan> loans = loanRepository.findByBookId(id);
+        if (loans.isEmpty()) {
+            return ResponseEntity.ok().body("대출 가능합니다.");
+        }
+        for (Loan loan : loans) {
+            if(!loan.getReturnStatus()){
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("대출 불가능합니다. 이미 대출 중입니다.");
+            }
+        }
+        return ResponseEntity.ok().body("대출 가능합니다.");
+    }
+
+    public int passedDays(LocalDate loanDate){
+        LocalDate today = LocalDate.now();
+        long daysBetween = ChronoUnit.DAYS.between(loanDate, today);
+        return (int) daysBetween;
+    }
+
 
 }

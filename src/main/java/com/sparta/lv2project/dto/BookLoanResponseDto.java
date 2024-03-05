@@ -11,9 +11,9 @@ public class BookLoanResponseDto {
     private String author;
 
     public BookLoanResponseDto(Loan loan) {
-        this.name = loan.getMemberName();
-        this.telephone = loan.getTelephone();
-        this.title = loan.getTitle();
-        this.author = loan.getAuthor();
+        this.name = loan.getMember().getName();
+        this.telephone = loan.getMember().getTelephone();
+        this.title = loan.getBook().getTitle();
+        this.author = loan.getBook().getAuthor();
     }
 }
