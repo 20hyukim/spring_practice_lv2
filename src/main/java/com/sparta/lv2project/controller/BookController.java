@@ -1,10 +1,8 @@
 package com.sparta.lv2project.controller;
 
-import com.sparta.lv2project.dto.BookRequestDto;
-import com.sparta.lv2project.dto.BookResponseDto;
-import com.sparta.lv2project.dto.MemberRequestDto;
-import com.sparta.lv2project.dto.MemberResponseDto;
+import com.sparta.lv2project.dto.*;
 import com.sparta.lv2project.service.BookService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +12,7 @@ import java.util.List;
 @RequestMapping("/book")
 public class BookController {
 
+    @Autowired
     private final BookService bookService;
 
     public BookController(BookService bookService) {
@@ -46,5 +45,12 @@ public class BookController {
     }
 
     @PutMapping("/{id}")
-    public
+    public BookLoanResponseDto returnBook(@PathVariable Long id){
+        return bookService.returnBook(id);
+    }
+
+    @GetMapping("/member")
+    public List<BookLoanResponseDto> loanBook(){
+        return bookService.loanBook();
+    }
 }
